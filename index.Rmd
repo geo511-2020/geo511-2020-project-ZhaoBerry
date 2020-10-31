@@ -1,14 +1,14 @@
 ---
-title: "My Final Project Template"
-author: Your name here
+title: "Analysis of the temporal and spatial distribution of COVID-19 in New York City and its correlation with demographic data"
+author: Bowei Zhao
 subtitle: Subtitle here if desired
 ---
 
 # Introduction
 
-[~ 200 words]
+COVID-19 is a new type of coronavirus that broke out globally this year, which has had a great impact on people's normal life and work. As one of the largest cities in the United States, New York City also has a lot of confirmed and mortality cases in this epidemic. Therefore, visual analysis of the epidemic situation in New York City and correlation analysis between COVID-19 cases and certain demographic data may reveal certain patterns, so as to make some targeted recommendations for New York City to fight the epidemic.  
 
-Clearly stated background and questions / hypotheses / problems being addressed. Sets up the analysis in an interesting and compelling way.
+This project is used to study the temporal and spatial distribution of COVID-19 in New York City and the correlation between the number of COVID-19 cases in New York City and certain demographic data.
 
 # Materials and methods
 
