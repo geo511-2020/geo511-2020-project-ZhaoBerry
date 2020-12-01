@@ -32,44 +32,62 @@ You can do numbers like this:
 2. The second most important thing
 3. The third most important thing
 
-See [http://rmarkdown.rstudio.com/](http://rmarkdown.rstudio.com/) for all the amazing things you can do.
-
-
-Here's my first code chunk.
-```{r}
-1+2
-```
-
-Load any required packages in a code chunk (you may need to install some packages):
+## Load required packages
 
 ```{r, message=F, warning=F}
 library(tidyverse)
 library(leaflet)
-library(kableExtra)
-knitr::opts_chunk$set(cache=TRUE)  # cache the results for quick compiling
+library(sf)
+library(maptools)
 ```
 
 ## Download and clean all required data
-```{r}
-n=20
-data=data.frame(x=runif(n,-180,180),
-                y=runif(n,-60,60),
-                size = runif(n, 5, 20),
-                category = factor(
-                  sample(letters[1:5], n, replace = TRUE)
-                  ),
-                value = rnorm(n))
+```{r, message=F, warning=F}
+nyc = st_read("data/MODZCTA_2010.shp")
+covid_19 = read.csv("data/covid19.csv")
+covid_19 = covid_19 %>% mutate(MODIFIED_ZCTA = as.factor(MODIFIED_ZCTA))
+nyc_covid = inner_join(nyc, covid_19, by = c("MODZCTA" = "MODIFIED_ZCTA"))
+ggplot(nyc_covid) + geom_sf(aes(fill = COVID_CASE_COUNT)) + scale_fill_gradient2(low = "yellow",mid = "orange", high = "red", midpoint = 2900) + labs(title = "Distribution map of COVID19 confirmed cases in New York City", fill = "Count")
+ggplot(nyc_covid) + geom_sf(aes(fill = COVID_DEATH_COUNT)) + scale_fill_gradient2(low = "pink",mid = "purple", high = "blue", midpoint = 225) + labs(title = "Distribution map of COVID19 death cases in New York City", fill = "Count")
 ```
 
-```{r, results='asis'}
-data %>% 
-  slice(1:10) %>% #show only 1:n rows
-  kable(digits=2,align="c")%>% #make table and round to two digits
-  kable_styling(bootstrap_options = 
-                  c("striped", "hover", "condensed", "responsive")) #apply other formatting
-```
+## Use an interactive map to show the distribution of COVID19 in New York City
 
-Add any additional processing steps here.
+```{r, message=F, warning=F}
+pal <- colorBin("YlOrRd", domain = nyc_covid$COVID_CASE_COUNT)
+
+labels <- sprintf(
+  "<strong>%s</strong><br/>%g cases<sup></sup>",
+  nyc_covid$NEIGHBORHOOD_NAME, nyc_covid$COVID_CASE_COUNT
+) %>% lapply(htmltools::HTML)
+
+#nyc_covid_sp = as(nyc_covid, Class = "Spatial")
+nyc_wgs=st_transform(nyc_covid,CRS("+proj=longlat +datum=WGS84"))
+
+leaflet(nyc_wgs) %>%
+  setView(lng = -73.98928, lat = 40.75042, zoom = 10) %>%
+  addTiles() %>%
+  addPolygons(
+    fillColor = ~pal(COVID_CASE_COUNT),
+    weight = 2,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlight = highlightOptions(
+      weight = 5,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE),
+    label = labels,
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto")) %>%
+  addLegend(pal = pal, values = ~COVID_CASE_COUNT, opacity = 0.7, title = NULL,
+    position = "bottomright")
+```
 
 # Results
 
@@ -78,21 +96,6 @@ Add any additional processing steps here.
 Tables and figures (maps and other graphics) are carefully planned to convey the results of your analysis. Intense exploration and evidence of many trials and failures. The author looked at the data in many different ways before coming to the final presentation of the data.
 
 Show tables, plots, etc. and describe them.
-
-```{r, fig.width=6, fig.height=3, fig.cap="Map of completely random data"}
-m <- leaflet(data) %>% 
-  addTiles() %>% 
-  addCircleMarkers(~x, ~y, radius = ~size,color = ~as.factor(category)) %>% 
-  addPopups(~x[2], ~y[2], "Random popup")
-m  # a map with the default OSM tile layer
-```
-
-
-```{r}
-data %>% 
-  ggplot(aes(x=x,y=y,col=category))+
-  geom_point()
-```
 
 # Conclusions
 
