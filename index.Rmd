@@ -1,36 +1,25 @@
 ---
 title: "Analysis of the temporal and spatial distribution of COVID-19 in New York City and its correlation with demographic data"
 author: Bowei Zhao
-subtitle: Subtitle here if desired
 ---
 
 # Introduction
 
 COVID-19 is a new type of coronavirus that broke out globally this year, which has had a great impact on people's normal life and work. As one of the largest cities in the United States, New York City also has a lot of confirmed and mortality cases in this epidemic. Therefore, visual analysis of the epidemic situation in New York City and correlation analysis between COVID-19 cases and certain demographic data may reveal certain patterns, so as to make some targeted recommendations for New York City to fight the epidemic.  
 
-This project is used to study the temporal and spatial distribution of COVID-19 in New York City and the correlation between the number of COVID-19 cases in New York City and certain demographic data.
+This project is used to study the spatial distribution of COVID-19 in New York City and the correlation between the number of COVID-19 cases in New York City and certain demographic data.
+
+<br>
 
 # Materials and methods
 
-[~ 200 words]
+<br>
 
-Narrative: Clear narrative description of the data sources and methods. Includes data from at least two sources that were integrated / merged in R.
+## Data Source  
 
-Code: The code associated with the project is well organized and easy to follow. Demonstrates mastery of R graphics and functions.
+In this project, the data I mainly used are New York City COVID-19 data, New York City boundary data and New York City demographic data. New York City's COVID-19 data comes from NYC Department of Health website, New York City's boundary data comes from NYC Open Data, and New York City's demographic data comes from tidycensus API.
 
-Data: The underlying data are publicly accessible via the web and downloaded/accessed within the Rmd script. If you want to use your own data, you must make it available on a website (e.g. Figshare) so that others are able to re-run your code.
-
-You can do bullets like this:
-
-* The first most important thing
-* The second most important thing
-* The third most important thing
-
-You can do numbers like this:
-
-1. The first most important thing
-2. The second most important thing
-3. The third most important thing
+<br>
 
 ## Load required packages
 
@@ -41,62 +30,24 @@ library(sf)
 library(maptools)
 library(tidycensus)
 library(tidyverse)
-library(mapview) 
-library(foreach)
-library(doParallel)
 library(GGally)
 library(reshape2)
 ```
 
-## Download and clean all required data
-```{r, message=F, warning=F}
-nyc = st_read("data/MODZCTA_2010.shp")
+<br>
+
+## Download and clean COVID-19 data
+
+```{r, message=F, warning=F, results = 'hide', echo=TRUE}
+nyc = st_read("data/MODZCTA_2010.shp", quiet = TRUE)
 covid_19 = read.csv("data/covid19.csv")
 covid_19 = covid_19 %>% mutate(MODIFIED_ZCTA = as.factor(MODIFIED_ZCTA))
 nyc_covid = inner_join(nyc, covid_19, by = c("MODZCTA" = "MODIFIED_ZCTA"))
-ggplot(nyc_covid) + geom_sf(aes(fill = COVID_CASE_COUNT)) + scale_fill_gradient2(low = "yellow",mid = "orange", high = "red", midpoint = 2900) + labs(title = "Distribution map of COVID19 confirmed cases(Nov.30th) in New York City", fill = "Count")
-ggplot(nyc_covid) + geom_sf(aes(fill = COVID_DEATH_COUNT)) + scale_fill_gradient2(low = "pink",mid = "purple", high = "blue", midpoint = 225) + labs(title = "Distribution map of COVID19 death cases(Nov.30th) in New York City", fill = "Count")
 ```
 
-## Use an interactive map to show the distribution of COVID19 in New York City
+<br>
 
-```{r, message=F, warning=F}
-pal <- colorBin("YlOrRd", domain = nyc_covid$COVID_CASE_COUNT)
-
-labels <- sprintf(
-  "<strong>%s</strong><br/>%g cases<sup></sup>",
-  nyc_covid$NEIGHBORHOOD_NAME, nyc_covid$COVID_CASE_COUNT
-) %>% lapply(htmltools::HTML)
-
-#nyc_covid_sp = as(nyc_covid, Class = "Spatial")
-nyc_wgs=st_transform(nyc_covid,CRS("+proj=longlat +datum=WGS84"))
-
-leaflet(nyc_wgs) %>%
-  setView(lng = -73.98928, lat = 40.75042, zoom = 10) %>%
-  addTiles() %>%
-  addPolygons(
-    fillColor = ~pal(COVID_CASE_COUNT),
-    weight = 2,
-    opacity = 1,
-    color = "white",
-    dashArray = "3",
-    fillOpacity = 0.7,
-    highlight = highlightOptions(
-      weight = 5,
-      color = "#666",
-      dashArray = "",
-      fillOpacity = 0.7,
-      bringToFront = TRUE),
-    label = labels,
-    labelOptions = labelOptions(
-      style = list("font-weight" = "normal", padding = "3px 8px"),
-      textsize = "15px",
-      direction = "auto")) %>%
-  addLegend(pal = pal, values = ~COVID_CASE_COUNT, opacity = 0.7, title = "COVID19 case count(Nov.30th)",
-    position = "bottomright")
-```
-
-
+## Use tidycensus API to get some specific New York City demographic data
 
 ```{r, message=F, warning=F}
 v18 <- load_variables(2018, "acs5", cache = TRUE)
@@ -127,6 +78,9 @@ medianincome_18 = get_acs(geography = "zcta",
 
 ```
 
+<br>
+
+## Join demographic data and covid-19 data together
 
 ```{r, message=F, warning=F}
 population_18 = rename(population_18, c("population"= "estimate"))
@@ -149,21 +103,13 @@ nyc_select = mutate(nyc_select, white_ratio = white/population, black_ratio = bl
 ```
 
 
-```{r, message=F, warning=F}
-ggplot(nyc_select) + geom_sf(aes(fill = as.numeric(old_ratio))) + scale_fill_gradient2(low = "yellow",mid = "orange", high = "red", midpoint = 0.15)  + labs(title = "Distribution map of old  people ratio in New York City", fill = "old people ratio")
-ggplot(nyc_select) + geom_sf(aes(fill = medianincome)) + scale_fill_gradient2(low = "yellow",mid = "orange", high = "red", midpoint = 125000)  + labs(title = "Distribution map of median income in New York City", fill = "median income")
-```
-
-
-```{r, message=F, warning=F, results= "hide"}
+```{r, message=F, warning=F, include=F}
 nyc_corr_pre = select(nyc_select, COVID_CASE_COUNT, COVID_DEATH_COUNT, white_ratio, black_ratio, asian_ratio, old_ratio, medianincome)
 nyc_corr =st_set_geometry(nyc_corr_pre, NULL)
 
 nyc_corr_1 <- round(cor(nyc_corr),2)
-head(nyc_corr_1)
-
 melted_nyc_corr <- melt(nyc_corr_1)
-head(melted_nyc_corr)
+
 
 ggplot(data = melted_nyc_corr, aes(x=Var1, y=Var2, fill=value)) + 
   geom_tile()
@@ -178,8 +124,6 @@ get_upper_tri <- function(nyc_corr_1){
 }
   
 upper_tri <- get_upper_tri(nyc_corr_1)
-upper_tri
-
 melted_nyc_corr <- melt(upper_tri, na.rm = TRUE)
 ggplot(data = melted_nyc_corr, aes(Var2, Var1, fill = value))+
  geom_tile(color = "white")+
@@ -209,10 +153,72 @@ ggheatmap <- ggplot(melted_nyc_corr, aes(Var2, Var1, fill = value))+
  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
     size = 12, hjust = 1))+
  coord_fixed()
-print(ggheatmap)
-
 ```
 
+<br>
+
+# Results
+
+<br>
+
+## Plot the number of confirmed COVID-19 cases and deaths from the zip code level in New York City until November 30
+
+```{r, message=F, warning=F}
+ggplot(nyc_covid) + geom_sf(aes(fill = COVID_CASE_COUNT)) + scale_fill_gradient2(low = "yellow",mid = "orange", high = "red", midpoint = 2900) + labs(title = "Distribution map of COVID19 confirmed cases(Until Nov.30th) in New York City", fill = "Count")
+ggplot(nyc_covid) + geom_sf(aes(fill = COVID_DEATH_COUNT)) + scale_fill_gradient2(low = "pink",mid = "purple", high = "blue", midpoint = 225) + labs(title = "Distribution map of COVID19 death cases(Until Nov.30th) in New York City", fill = "Count")
+```
+
+<br>
+
+## Use an interactive map to show the distribution of COVID19 in New York City
+
+```{r, message=F, warning=F}
+pal <- colorBin("YlOrRd", domain = nyc_covid$COVID_CASE_COUNT)
+
+labels <- sprintf(
+  "<strong>%s</strong><br/>%g cases<sup></sup>",
+  nyc_covid$NEIGHBORHOOD_NAME, nyc_covid$COVID_CASE_COUNT
+) %>% lapply(htmltools::HTML)
+
+nyc_wgs=st_transform(nyc_covid,CRS("+proj=longlat +datum=WGS84"))
+
+leaflet(nyc_wgs) %>%
+  setView(lng = -73.98928, lat = 40.75042, zoom = 10) %>%
+  addTiles() %>%
+  addPolygons(
+    fillColor = ~pal(COVID_CASE_COUNT),
+    weight = 2,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlight = highlightOptions(
+      weight = 5,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE),
+    label = labels,
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto")) %>%
+  addLegend(pal = pal, values = ~COVID_CASE_COUNT, opacity = 0.7, title = "COVID19 case count(Until Nov.30th)",
+    position = "bottomright")
+```
+
+<br>
+
+## Plot the old people ratio and median income distribution map in New York City
+
+```{r, message=F, warning=F}
+ggplot(nyc_select) + geom_sf(aes(fill = as.numeric(old_ratio))) + scale_fill_gradient2(low = "purple",mid = "white", high = "red", midpoint = 0.15)  + labs(title = "Distribution map of old people ratio in New York City", fill = "old people ratio")
+ggplot(nyc_select) + geom_sf(aes(fill = medianincome)) + scale_fill_gradient(low = "white", high = "red") + labs(title = "Distribution map of median income in New York City", fill = "median income")
+```
+
+<br>
+
+## Use heatmap to show the correlation between COVID-19 data and demographic data
 
 ```{r, message=F, warning=F}
 ggheatmap + 
@@ -230,20 +236,16 @@ theme(
   guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
                 title.position = "top", title.hjust = 0.5))
 ```
-# Results
 
-[~200 words]
-
-Tables and figures (maps and other graphics) are carefully planned to convey the results of your analysis. Intense exploration and evidence of many trials and failures. The author looked at the data in many different ways before coming to the final presentation of the data.
-
-Show tables, plots, etc. and describe them.
+<br>
 
 # Conclusions
 
-[~200 words]
+New York City's COVID-19 confirmed and death cases are located in northern Manhattan, northwest of Queens, southeast of Brooklyn and west of Staten island. The number of COVID-19 cases in New York City has a clear negative correlation with median income. In terms of ethnicity, places with a large proportion of white people are less likely to be infected with COVID-19. There is not much correlation between the proportion of old people and COVID-19 cases.
 
-Clear summary adequately describing the results and putting them in context. Discussion of further questions and ways to continue investigation.
+<br>
 
 # References
 
-All sources are cited in a consistent manner
+1.Coronavirus in the U.S.: Latest Map and Case Count, https://www.nytimes.com/interactive/2020/us/coronavirus-us-cases.html  
+2. tidycenses help webist, https://walker-data.com/tidycensus/
