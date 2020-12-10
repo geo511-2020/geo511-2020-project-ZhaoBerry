@@ -1,5 +1,5 @@
 ---
-title: "Analysis of the temporal and spatial distribution of COVID-19 in New York City and its correlation with demographic data"
+title: "Analysis of the spatial distribution of COVID-19 in New York City and its correlation with demographic data"
 author: Bowei Zhao
 ---
 
