@@ -39,6 +39,13 @@ library(tidyverse)
 library(leaflet)
 library(sf)
 library(maptools)
+library(tidycensus)
+library(tidyverse)
+library(mapview) 
+library(foreach)
+library(doParallel)
+library(GGally)
+library(reshape2)
 ```
 
 ## Download and clean all required data
@@ -47,8 +54,8 @@ nyc = st_read("data/MODZCTA_2010.shp")
 covid_19 = read.csv("data/covid19.csv")
 covid_19 = covid_19 %>% mutate(MODIFIED_ZCTA = as.factor(MODIFIED_ZCTA))
 nyc_covid = inner_join(nyc, covid_19, by = c("MODZCTA" = "MODIFIED_ZCTA"))
-ggplot(nyc_covid) + geom_sf(aes(fill = COVID_CASE_COUNT)) + scale_fill_gradient2(low = "yellow",mid = "orange", high = "red", midpoint = 2900) + labs(title = "Distribution map of COVID19 confirmed cases in New York City", fill = "Count")
-ggplot(nyc_covid) + geom_sf(aes(fill = COVID_DEATH_COUNT)) + scale_fill_gradient2(low = "pink",mid = "purple", high = "blue", midpoint = 225) + labs(title = "Distribution map of COVID19 death cases in New York City", fill = "Count")
+ggplot(nyc_covid) + geom_sf(aes(fill = COVID_CASE_COUNT)) + scale_fill_gradient2(low = "yellow",mid = "orange", high = "red", midpoint = 2900) + labs(title = "Distribution map of COVID19 confirmed cases(Nov.30th) in New York City", fill = "Count")
+ggplot(nyc_covid) + geom_sf(aes(fill = COVID_DEATH_COUNT)) + scale_fill_gradient2(low = "pink",mid = "purple", high = "blue", midpoint = 225) + labs(title = "Distribution map of COVID19 death cases(Nov.30th) in New York City", fill = "Count")
 ```
 
 ## Use an interactive map to show the distribution of COVID19 in New York City
@@ -85,10 +92,144 @@ leaflet(nyc_wgs) %>%
       style = list("font-weight" = "normal", padding = "3px 8px"),
       textsize = "15px",
       direction = "auto")) %>%
-  addLegend(pal = pal, values = ~COVID_CASE_COUNT, opacity = 0.7, title = NULL,
+  addLegend(pal = pal, values = ~COVID_CASE_COUNT, opacity = 0.7, title = "COVID19 case count(Nov.30th)",
     position = "bottomright")
 ```
 
+
+
+```{r, message=F, warning=F}
+v18 <- load_variables(2018, "acs5", cache = TRUE)
+
+population_18 <- get_acs(geography = "zcta",
+                         variables = c(population = "B01003_001"),
+                          year = 2018)
+
+white_18 = get_acs(geography = "zcta",
+                         variables = c(white = "B02001_002"),
+                          year = 2018)
+
+black_18 = get_acs(geography = "zcta",
+                         variables = c(black = "B02001_003"),
+                          year = 2018)
+
+asian_18 = get_acs(geography = "zcta",
+                         variables = c(asian = "B02001_005"),
+                          year = 2018)
+
+old_18 = get_acs(geography = "zcta",
+                         variables = c(old = "C18108_010"),
+                          year = 2018)
+
+medianincome_18 = get_acs(geography = "zcta",
+                         variables = c(medianincome = "B19013_001"),
+                          year = 2018)
+
+```
+
+
+```{r, message=F, warning=F}
+population_18 = rename(population_18, c("population"= "estimate"))
+white_18 = rename(white_18, c("white"= "estimate"))
+black_18 = rename(black_18, c("black"= "estimate"))
+asian_18 = rename(asian_18, c("asian"= "estimate"))
+old_18 = rename(old_18, c("old"= "estimate"))
+medianincome_18 = rename(medianincome_18, c("medianincome"= "estimate"))
+
+nyc_join = nyc_covid %>% left_join(population_18, by = c("MODZCTA" = "GEOID")) %>%
+  left_join(white_18, by = c("MODZCTA" = "GEOID")) %>%
+  left_join(black_18, by = c("MODZCTA" = "GEOID")) %>%
+  left_join(asian_18, by = c("MODZCTA" = "GEOID")) %>%
+  left_join(old_18, by = c("MODZCTA" = "GEOID")) %>%
+  left_join(medianincome_18, by = c("MODZCTA" = "GEOID"))
+
+nyc_select = select(nyc_join, MODZCTA, NEIGHBORHOOD_NAME, COVID_CASE_COUNT, COVID_DEATH_COUNT, population, white, black, asian, old, medianincome)
+
+nyc_select = mutate(nyc_select, white_ratio = white/population, black_ratio = black/population, asian_ratio = asian/population, old_ratio = old/population)
+```
+
+
+```{r, message=F, warning=F}
+ggplot(nyc_select) + geom_sf(aes(fill = as.numeric(old_ratio))) + scale_fill_gradient2(low = "yellow",mid = "orange", high = "red", midpoint = 0.15)  + labs(title = "Distribution map of old  people ratio in New York City", fill = "old people ratio")
+ggplot(nyc_select) + geom_sf(aes(fill = medianincome)) + scale_fill_gradient2(low = "yellow",mid = "orange", high = "red", midpoint = 125000)  + labs(title = "Distribution map of median income in New York City", fill = "median income")
+```
+
+
+```{r, message=F, warning=F, results= "hide"}
+nyc_corr_pre = select(nyc_select, COVID_CASE_COUNT, COVID_DEATH_COUNT, white_ratio, black_ratio, asian_ratio, old_ratio, medianincome)
+nyc_corr =st_set_geometry(nyc_corr_pre, NULL)
+
+nyc_corr_1 <- round(cor(nyc_corr),2)
+head(nyc_corr_1)
+
+melted_nyc_corr <- melt(nyc_corr_1)
+head(melted_nyc_corr)
+
+ggplot(data = melted_nyc_corr, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile()
+
+get_lower_tri<-function(nyc_corr_1){
+  nyc_corr_1[upper.tri(nyc_corr_1)] <- NA
+  return(nyc_corr_1)
+}
+get_upper_tri <- function(nyc_corr_1){
+  nyc_corr_1[lower.tri(nyc_corr_1)]<- NA
+  return(nyc_corr_1)
+}
+  
+upper_tri <- get_upper_tri(nyc_corr_1)
+upper_tri
+
+melted_nyc_corr <- melt(upper_tri, na.rm = TRUE)
+ggplot(data = melted_nyc_corr, aes(Var2, Var1, fill = value))+
+ geom_tile(color = "white")+
+ scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+   midpoint = 0, limit = c(-1,1), space = "Lab", 
+   name="Pearson\nCorrelation") +
+  theme_minimal()+ 
+ theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 12, hjust = 1))+
+ coord_fixed()
+
+reorder_nyc_corr <- function(nyc_corr_1){
+dd <- as.dist((1-nyc_corr_1)/2)
+hc <- hclust(dd)
+nyc_corr_1 <-nyc_corr_1[hc$order, hc$order]
+}
+
+nyc_corr_1 <- reorder_nyc_corr(nyc_corr_1)
+upper_tri <- get_upper_tri(nyc_corr_1)
+melted_nyc_corr <- melt(upper_tri, na.rm = TRUE)
+ggheatmap <- ggplot(melted_nyc_corr, aes(Var2, Var1, fill = value))+
+ geom_tile(color = "white")+
+ scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+   midpoint = 0, limit = c(-1,1), space = "Lab", 
+    name="Pearson\nCorrelation") +
+  theme_minimal()+ 
+ theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 12, hjust = 1))+
+ coord_fixed()
+print(ggheatmap)
+
+```
+
+
+```{r, message=F, warning=F}
+ggheatmap + 
+geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
+theme(
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.border = element_blank(),
+  panel.background = element_blank(),
+  axis.ticks = element_blank(),
+  legend.justification = c(1, 0),
+  legend.position = c(0.6, 0.7),
+  legend.direction = "horizontal")+
+  guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                title.position = "top", title.hjust = 0.5))
+```
 # Results
 
 [~200 words]
