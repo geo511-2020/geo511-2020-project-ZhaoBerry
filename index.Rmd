@@ -218,7 +218,7 @@ ggplot(nyc_select) + geom_sf(aes(fill = medianincome)) + scale_fill_gradient(low
 
 <br>
 
-## Use heatmap to show the correlation between COVID-19 data and demographic data
+## Use heatmap to show the correlation between COVID-19 data and demographic data 
 
 ```{r, message=F, warning=F}
 ggheatmap + 
@@ -239,7 +239,7 @@ theme(
 
 <br>
 
-# Conclusions
+# Conclusions 
 
 New York City's COVID-19 confirmed and death cases are located in northern Manhattan, northwest of Queens, southeast of Brooklyn and west of Staten island. The number of COVID-19 cases in New York City has a clear negative correlation with median income. In terms of ethnicity, places with a large proportion of white people are less likely to be infected with COVID-19. There is not much correlation between the proportion of old people and COVID-19 cases.
 
